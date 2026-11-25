@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function role() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role; }
+    function isAdmin()     { return signedIn() && role() == 'admin'; }
+    function isTreasurer() { return signedIn() && role() in ['admin', 'treasurer']; }
+    function isAdder()     { return signedIn() && role() in ['admin', 'treasurer', 'adder']; }
+    function isMember()    { return signedIn() && role() in ['admin', 'treasurer', 'adder', 'viewer']; }
+    function validTx() {
+      let d = request.resource.data;
+      return d.type in ['in', 'out'] && d.amt is number && d.amt > 0 && d.amt < 1000000000
+        && d.date is string && d.party is string && d.party.size() > 0 && d.cat is string;
+    }
+
+    // Accounts: users create only their own 'pending' profile; only an admin can change roles.
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create: if signedIn() && request.auth.uid == uid && request.resource.data.role == 'pending';
+      allow update, delete: if isAdmin();
+    }
+    match /settings/{id} { allow read: if isMember(); allow write: if isAdmin(); }
+    match /members/{id} {
+      allow read: if isMember();
+      allow create: if isTreasurer();
+      allow update, delete: if isAdmin();
+    }
+    // Entries: adders add income, treasurers add anything; only admin may correct or delete.
+    match /tx/{id} {
+      allow read: if isMember();
+      allow create: if validTx() && (request.resource.data.type == 'in' ? isAdder() : isTreasurer());
+      allow update: if isAdmin() && validTx();
+      allow delete: if isAdmin();
+    }
+    // Public page: one summary document that the admin publishes on purpose. Anyone may read it; only admin may write.
+    match /pub/{id} { allow read: if true; allow write: if isAdmin(); }
+    // Audit log: append-only, readable by admin.
+    match /log/{id} {
+      allow read: if isAdmin();
+      allow create: if isAdder();
+      allow update, delete: if false;
+    }
+  }
+}
