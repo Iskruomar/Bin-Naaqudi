@@ -9,7 +9,7 @@ let U = null, P = null, tab = "act", eid = null, pend = null, flash = "", unsub 
 A.onAuthStateChanged(auth, (u) => {
   unsub?.(); stop(); started = false; U = u; P = null;
   if (!u) return login();
-  unsub = F.onSnapshot(F.doc(db, "users", u.uid), (s) => { P = s.exists() ? s.data() : null; gate(); }, () => { P = null; gate(); });
+  unsub = F.onSnapshot(F.doc(db, "users", u.uid), (s) => { P = s.exists() ? s.data() : null; gate(); }, (err) => { screen(`<h1>Khalad Firebase</h1><p>${esc(err.message)}</p><p>UID: ${esc(u.uid)}</p><button class="btn ghost" data-act="out">Ka bax</button>`); });
 });
 
 function screen(html) { root.innerHTML = `<div class="center"><div class="card auth"><div class="logo">${ic("safe")}</div>${html}</div></div>`; }
@@ -114,19 +114,3 @@ root.addEventListener("submit", async (e) => {
     $("#ae").textContent = "";
     try { await A.signInWithEmailAndPassword(auth, d.email, d.pw); } catch { $("#ae").textContent = "Email ama erayga sirta waa khalad."; }
   } else if (f.id === "tf") {
-    const x = readTx(f, f.dataset.t);
-    set("tx", eid, x, true).catch(deny); logit(P, U.uid, "Sixid", `${x.type} ${x.amt}`);
-    eid = null; flash = "Waa la sixay ✓"; render(true);
-  } else if (f.id === "pf") {
-    const evs = [...new Set(D.tx.map((x) => x.ev).filter(Boolean))], campaigns = {};
-    evs.forEach((n, i) => { campaigns[n] = { on: d["o" + i] === "on", target: parseFloat(d["g" + i]) || 0 }; });
-    const pub = { on: d.on === "on", showBalance: d.showBalance === "on", showFeed: d.showFeed === "on", showNames: d.showNames === "on", note: d.note.trim(), how: d.how.trim(), contact: d.contact.trim(), campaigns };
-    D.cfg = { ...D.cfg, pub };
-    set("settings", "main", { pub }, true).catch(deny);
-    set("pub", "summary", buildSummary(D)).catch(deny);
-    logit(P, U.uid, "Bogga dadweynaha", pub.on ? "la daabacay" : "la qariyay"); flash = pub.on ? "Bogga dadweynaha waa la cusboonaysiiyay ✓" : "Bogga dadweynaha waa la qariyay."; render(true);
-  } else if (f.id === "sf") {
-    set("settings", "main", { org: d.org.trim() || "ISKAASHATADA BIN NAAKHUDI", cur: d.cur.trim() || "$", dueAmt: parseFloat(d.dueAmt) || 0, pStart: d.pStart, dueDate: d.dueDate }, true).catch(deny);
-    logit(P, U.uid, "Dejin", "la beddelay"); flash = "Waa la kaydiyay ✓"; render(true);
-  }
-});
